@@ -234,9 +234,49 @@
   - 某些情况下父类加载器需要委托子类加载器去加载class文件、受到加载范围的限制、父类加载器无法加载到需要的文件
   - 由于Driver接口定义在jdk当中的，而其实现由各个数据库的服务商来提供，比如mysql的就写了`MySQL Connector`，那么问题就来了，DriverManager（也由jdk提供）要加载各个实现了Driver接口的实现类，然后进行管理，但是DriverManager由启动类加载器加载，只能记载JAVA_HOME的lib下文件，而其实现是由服务商提供的，由系统类加载器加载，这个时候就需要启动类加载器来委托子类来加载Driver实现，从而破坏了双亲委派，这里仅仅是举了破坏双亲委派的其中一个情况
 
-#### OutOfMemoryError异常
+#### OutOfMemoryError线上排查及其解决（文件导出）
 
+- **top** 命令，它能够实时显示系统中各个进程的资源占用状况，经常用来监控linux的系统状况，比如cpu、内存的使用。
 
+- **dmesg**。dmesg可以用来查看开机之后的系统日志，其中可以捕捉到一些系统资源与进程的变化信息。dmesg |grep -E ‘kill|oom|out of memory’ 来搜索内存溢出的信息挺实用
+
+- **查看JVM状态**
+
+  - **ps -aux|grep java** 当服务重新部署后，可以找出当前Java进程的PID
+  - **jstat -gcutil pid interval** 用于查看当前GC的状态,它对Java应用程序的资源和性能进行实时的命令行的监控，包括了对Heap size和垃圾回收状况的监控
+  - **jmap -histo:live pid** 可用统计存活对象的分布情况，从高到低查看占据内存最多的对象
+
+- **Java dump分析问题**
+
+  - **jmap -dump:format=b,file=文件名 [pid]** 利用Jmap dump
+
+  - 用gcore [pid]直接保留内存信息
+
+    - 先生成core dump
+
+    - 把core文件转换成hprof
+
+    - 使用性能分析工具对hprof进行分析
+
+      - 一个是 *MAT*，一个基于Eclipse的内存分析工具，它可以快速的计算出在内存中对象的占用大小，看看是谁阻止了垃圾收集器的回收工作，并可以通过报表直观的查看到可能造成这种结果的对象。第二个是*zprofile*(阿里内部工具)
+
+        ![这里写图片描述](https://img-blog.csdn.net/20161124235638127)
+
+        ![这里写图片描述](https://img-blog.csdn.net/20161124235705765)
+
+      - 于是我们推测可能是ali-tomcat的StandardClassLoader的类加载时出了问题，导致引入的byte[]数组占用的堆大小过多,而Full GC回收不过来，导致了OOM
+
+      - 通过tomcat查明真相
+
+需要把它`dump`到本地，然后通过一些工具进行分析，才能大概的发现问题出在哪里
+
+- 使用`java`自带的`jmap`命令，生成 `hprof`文件
+- 使用mat工具分析 hprof文件
+  - 当前对内存中有两个类型的对象几乎占满了整个堆内存，一个是`byte[]`数组，一个是`Http11OutputBuffer`对象。查看`details`,发现这两个问题都来自于`tomcat`
+  - 进一步打开`Histogram`，找到占用内存大的对象
+- 修改 `server.xml`的配置（maxHttpHeaderSize）、通过`-Xms`和`-Xmx`直接调大了堆内存的大小
+
+JVM 牛创业板
 
 ####  java 类加载机制
 
