@@ -280,5 +280,99 @@
 
 程序在向系统申请分配内存空间后(new)，在使用完毕后未释放。结果导致一直占据该内存单元，我们和程序都无法再使用该内存单元，直到程序结束
 
-####  java 类加载机制
+- 如果长生命周期的对象持有短生命周期的引用，就很可能会出现内存泄露
 
+  ~~~java
+  public class Simple {
+   
+      Object object;
+   
+      public void method1(){
+          object = new Object();
+      //...其他代码
+      }
+  }
+  ~~~
+
+可以改为这样：
+
+~~~java
+public class Simple {
+ 
+    Object object;
+ 
+    public void method1(){
+        object = new Object();
+        //...其他代码
+        object = null;
+    }
+}
+~~~
+
+在内存对象明明已经不需要的时候，还仍然保留着这块内存和它的访问方式（引用），这是所有语言都有可能会出现的内存泄漏方式
+
+**备注：尽量减小对象的作用域**
+
+**容易发生内存泄露的例子和解决方法**
+
+- **null值的手动设置**
+
+  ~~~java
+  public E pop(){
+      if(size == 0)
+          return null;
+      else{
+          E e = (E) elementData[--size];
+          elementData[size] = null;
+          return e;
+      }
+  }
+  ~~~
+
+- **容器使用时的内存泄露**
+
+  ~~~java
+  void method(){
+      Vector vector = new Vector();
+      for (int i = 1; i<100; i++)
+      {
+          Object object = new Object();
+          vector.add(object);
+          object = null;
+      }
+      //...对vector的操作
+      //...与vector无关的其他操作
+  }
+  ~~~
+
+  对vector操作完成之后，执行下面与vector无关的代码时，如果发生了GC操作，这一系列的object是没法被回收的，而此处的内存泄露可能是短暂的，因为在整个method()方法执行完成后，那些对象还是可以被回收
+
+  **容器时方法内的局部变量，造成的内存泄漏影响可能不算很大（但我们也应该避免），但是，如果这个容器作为一个类的成员变量，甚至是一个静态（static）的成员变量时，就要更加注意内存泄露了**
+
+  ~~~java
+  public class CollectionMemory {
+      public static void main(String s[]){
+          Set<MyObject> objects = new LinkedHashSet<MyObject>();
+          objects.add(new MyObject());
+          objects.add(new MyObject());
+          objects.add(new MyObject());
+          System.out.println(objects.size());
+          while(true){
+              objects.add(new MyObject());
+          }
+      }
+  }
+   
+  class MyObject{
+      //设置默认数组长度为99999更快的发生OutOfMemoryError
+      List<String> list = new ArrayList<>(99999);
+  }
+  ~~~
+
+- **单例模式导致的内存泄露**
+
+  很多时候我们可以把它的生命周期与整个程序的生命周期看做差不多的，所以是一个长生命周期的对象。如果这个对象持有其他对象的引用，也很容易发生内存泄露
+
+- **内部类和外部模块的引用**
+
+**备注：非java代码中可能会用到相应的申请内存的操作（如c的malloc()函数），而在这些非java代码中并没有有效的释放这些内存，就可以使用finalize()方法，并在里面调用本地方法的free()等函数、finalize()并不适合用作普通的清理工作**
