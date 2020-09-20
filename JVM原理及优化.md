@@ -234,10 +234,149 @@
   - 某些情况下父类加载器需要委托子类加载器去加载class文件、受到加载范围的限制、父类加载器无法加载到需要的文件
   - 由于Driver接口定义在jdk当中的，而其实现由各个数据库的服务商来提供，比如mysql的就写了`MySQL Connector`，那么问题就来了，DriverManager（也由jdk提供）要加载各个实现了Driver接口的实现类，然后进行管理，但是DriverManager由启动类加载器加载，只能记载JAVA_HOME的lib下文件，而其实现是由服务商提供的，由系统类加载器加载，这个时候就需要启动类加载器来委托子类来加载Driver实现，从而破坏了双亲委派，这里仅仅是举了破坏双亲委派的其中一个情况
 
-#### 虚拟机性能监控与故障处理工具
+#### OutOfMemoryError线上排查及其解决（文件导出）
 
-- jps 虚拟机进程状况工具 
-  - 
+- **top** 命令，它能够实时显示系统中各个进程的资源占用状况，经常用来监控linux的系统状况，比如cpu、内存的使用。
 
-####  java 类加载机制
+- **dmesg**。dmesg可以用来查看开机之后的系统日志，其中可以捕捉到一些系统资源与进程的变化信息。dmesg |grep -E ‘kill|oom|out of memory’ 来搜索内存溢出的信息挺实用
 
+- **查看JVM状态**
+
+  - **ps -aux|grep java** 当服务重新部署后，可以找出当前Java进程的PID
+  - **jstat -gcutil pid interval** 用于查看当前GC的状态,它对Java应用程序的资源和性能进行实时的命令行的监控，包括了对Heap size和垃圾回收状况的监控
+  - **jmap -histo:live pid** 可用统计存活对象的分布情况，从高到低查看占据内存最多的对象
+
+- **Java dump分析问题**
+
+  - **jmap -dump:format=b,file=文件名 [pid]** 利用Jmap dump
+
+  - 用gcore [pid]直接保留内存信息
+
+    - 先生成core dump
+
+    - 把core文件转换成hprof
+
+    - 使用性能分析工具对hprof进行分析
+
+      - 一个是 *MAT*，一个基于Eclipse的内存分析工具，它可以快速的计算出在内存中对象的占用大小，看看是谁阻止了垃圾收集器的回收工作，并可以通过报表直观的查看到可能造成这种结果的对象。第二个是*zprofile*(阿里内部工具)
+
+        ![这里写图片描述](https://img-blog.csdn.net/20161124235638127)
+
+        ![这里写图片描述](https://img-blog.csdn.net/20161124235705765)
+
+      - 于是我们推测可能是ali-tomcat的StandardClassLoader的类加载时出了问题，导致引入的byte[]数组占用的堆大小过多,而Full GC回收不过来，导致了OOM
+
+      - 通过tomcat查明真相
+
+需要把它`dump`到本地，然后通过一些工具进行分析，才能大概的发现问题出在哪里
+
+- 使用`java`自带的`jmap`命令，生成 `hprof`文件
+- 使用mat工具分析 hprof文件
+  - 当前对内存中有两个类型的对象几乎占满了整个堆内存，一个是`byte[]`数组，一个是`Http11OutputBuffer`对象。查看`details`,发现这两个问题都来自于`tomcat`
+  - 进一步打开`Histogram`，找到占用内存大的对象
+- 修改 `server.xml`的配置（maxHttpHeaderSize）、通过`-Xms`和`-Xmx`直接调大了堆内存的大小
+
+#### JVM 内存泄漏及其解决
+
+程序在向系统申请分配内存空间后(new)，在使用完毕后未释放。结果导致一直占据该内存单元，我们和程序都无法再使用该内存单元，直到程序结束
+
+- 如果长生命周期的对象持有短生命周期的引用，就很可能会出现内存泄露
+
+  ~~~java
+  public class Simple {
+   
+      Object object;
+   
+      public void method1(){
+          object = new Object();
+      //...其他代码
+      }
+  }
+  ~~~
+
+可以改为这样：
+
+~~~java
+public class Simple {
+ 
+    Object object;
+ 
+    public void method1(){
+        object = new Object();
+        //...其他代码
+        object = null;
+    }
+}
+~~~
+
+在内存对象明明已经不需要的时候，还仍然保留着这块内存和它的访问方式（引用），这是所有语言都有可能会出现的内存泄漏方式
+
+**备注：尽量减小对象的作用域**
+
+**容易发生内存泄露的例子和解决方法**
+
+- **null值的手动设置**
+
+  ~~~java
+  public E pop(){
+      if(size == 0)
+          return null;
+      else{
+          E e = (E) elementData[--size];
+          elementData[size] = null;
+          return e;
+      }
+  }
+  ~~~
+
+- **容器使用时的内存泄露**
+
+  ~~~java
+  void method(){
+      Vector vector = new Vector();
+      for (int i = 1; i<100; i++)
+      {
+          Object object = new Object();
+          vector.add(object);
+          object = null;
+      }
+      //...对vector的操作
+      //...与vector无关的其他操作
+  }
+  ~~~
+
+  对vector操作完成之后，执行下面与vector无关的代码时，如果发生了GC操作，这一系列的object是没法被回收的，而此处的内存泄露可能是短暂的，因为在整个method()方法执行完成后，那些对象还是可以被回收
+
+  **容器时方法内的局部变量，造成的内存泄漏影响可能不算很大（但我们也应该避免），但是，如果这个容器作为一个类的成员变量，甚至是一个静态（static）的成员变量时，就要更加注意内存泄露了**
+
+  ~~~java
+  public class CollectionMemory {
+      public static void main(String s[]){
+          Set<MyObject> objects = new LinkedHashSet<MyObject>();
+          objects.add(new MyObject());
+          objects.add(new MyObject());
+          objects.add(new MyObject());
+          System.out.println(objects.size());
+          while(true){
+              objects.add(new MyObject());
+          }
+      }
+  }
+   
+  class MyObject{
+      //设置默认数组长度为99999更快的发生OutOfMemoryError
+      List<String> list = new ArrayList<>(99999);
+  }
+  ~~~
+
+- **单例模式导致的内存泄露**
+
+  很多时候我们可以把它的生命周期与整个程序的生命周期看做差不多的，所以是一个长生命周期的对象。如果这个对象持有其他对象的引用，也很容易发生内存泄露
+
+- **内部类和外部模块的引用**
+
+- **Set、Map 容器使用默认 equals 方法造成的内存泄露**
+
+  重写 equals 方法只对值进行比较
+
+**备注：非java代码中可能会用到相应的申请内存的操作（如c的malloc()函数），而在这些非java代码中并没有有效的释放这些内存，就可以使用finalize()方法，并在里面调用本地方法的free()等函数、finalize()并不适合用作普通的清理工作**
