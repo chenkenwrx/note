@@ -1,4 +1,35 @@
-#### Vc1、RabbitMQ 实现消息顺序（消息时序）
+#### 1、为什么要用消息中间件
+
+​       **实现系统的解耦，多个系统间通过消息中间件进行异步通信**
+
+#### 2、**RabbitMQ运作流程**
+
+​        **Virtual Host** : 每个virtual host本质上都是一个RabbitMQ Server（但是一个server中可以有多个virtual   host），拥有它自己若干的个Exchange、Queue和bings rule等等，类似于权限控制组。Virtual Host是权限控制的最小粒度。
+
+​        **Connection :** 一个TCP的连接。Producer和Consumer都是通过TCP连接到RabbitMQ Server的
+
+​        **Connection :** 一个TCP的连接。Producer和Consumer都是通过TCP连接到RabbitMQ Server的
+
+
+
+作者：极客慧
+链接：https://www.jianshu.com/p/22f117f5cf95
+来源：简书
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+作者：极客慧
+链接：https://www.jianshu.com/p/22f117f5cf95
+来源：简书
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+
+
+作者：极客慧
+链接：https://www.jianshu.com/p/22f117f5cf95
+来源：简书
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+#### 1、RabbitMQ 实现消息顺序（消息时序）
 
 1. 为什么会出现消息一致性问题
    - 多个客户端之间都是使用的本地时钟，而没有一个所谓的“全局时钟”，所以不能用“本地时间”来完全决定消息的时序
