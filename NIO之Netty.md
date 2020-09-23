@@ -547,16 +547,16 @@ public void test() throws IOException {
 **四大事件：**
 
 - `public static final int OP_READ = 1 << 0`
-  - 值为`1`，表示读操作，
+  - 值为`1`，**表示读操作**，
   - 代表本`Channel`已经接受到其他客户端传过来的消息，需要将`Channel`中的数据读取到`Buffer`中去
 - `public static final int OP_WRITE = 1 << 2`
-  - 值为`4`，表示写操作
+  - 值为`4`，**表示写操作**
   - 一般临时将`Channel`的事件修改为它，在处理完后又修改回去。我暂时也没明白具体的作用。
 - `public static final int OP_CONNECT = 1 << 3`
   - 值为`8`，代表建立连接。
   - 一般在`ServerSocketChannel`上绑定该事件，结合 `channel.finishConnect()`在连接建立异常时进行异常处理
 - `public static final int OP_ACCEPT = 1 << 4`
-  - 值为`16`，表示由新的网络连接可以`accept`。
+  - 值为`16`，**表示由新的网络连接可以`accept**`。
   - 与`ServerSocketChannel`进行绑定，用于创建新的`SocketChannel`，并把其注册到`Selector`上去
 
 **相关方法**
@@ -930,19 +930,14 @@ public class GroupChatClient {
 >
 > 零拷贝不仅仅带来更少的数据复制，还能减少线程的上下文切换，减少CPU缓存伪共享以及无CPU校验和计算。
 
-**传统IO的读写：**
+**传统IO的读写（四次上下文切换）：**
 
-```java
-File file = new File("test.txt");
-RandomAccessFile raf = new RandomAccessFile(file, "rw");
-
-byte[] arr = new byte[(int) file.length()];
-raf.read(arr);
-
-Socket socket = new ServerSocket(8080).accept();
-socket.getOutputStream().write(arr);
-12345678
-```
+- JVM发出read() 系统调用
+- OS上下文（第一次）切换到内核模式、hardware ----> kernel buffer
+- kernel buffer ——> user buffer、read系统调用返回。而系统调用的返回又会导致一次内核空间到用户空间的上下文切换(第二次上下文切换)
+- JVM处理代码逻辑并发送write（）系统调用
+- OS上下文切换到内核模式(第三次上下文切换)并从用户空间缓冲区复制数据到内核空间缓冲区(第三次拷贝: user buffer ——> kernel buffer)。
+- write系统调用返回，导致内核空间到用户空间的再次上下文切换(第四次上下文切换)。将内核空间缓冲区中的数据写到hardware(第四次拷贝: kernel buffer ——> hardware)。
 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/20200220152549266.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM1NzUxMDE0,size_16,color_FFFFFF,t_70)
 
@@ -967,26 +962,23 @@ socket.getOutputStream().write(arr);
 
 **NIO中的零拷贝（transferTo）：**
 
-```java
-public static void main(String[] args) throws IOException {
-    SocketChannel socketChannel = SocketChannel.open();
-    socketChannel.connect(new InetSocketAddress("localhost", 7001));
-    //得到一个文件CHANNEl
-    FileChannel channel = new FileInputStream("a.zip").getChannel();
+- **数据从磁盘写入内核空间缓冲区**
+- **再从内核空间缓冲区写入到Socket缓冲区**
+- **由Socket缓存区传递给数据发送引擎发送**
 
-    //准备发送
-    long startTime = System.currentTimeMillis();
+<img src="https://img2018.cnblogs.com/blog/1496926/201907/1496926-20190708123042734-1114676403.png" alt="图片" style="zoom:80%;" />
 
-    //在Linux下一个 transferTo 方法就可以完成传输
-    //在windows 下一次调用 transferTo 只能发送 8M，就需要分段传输文件
-    //传输时的位置
-    //transferTo 底层使用到零拷贝
-    long transferCount = channel.transferTo(0, channel.size(), socketChannel);
+然而这个模型中仍然有问题存在,在内核空间缓冲区中仍然存在数据的拷贝
 
-    System.out.println("发送的总的字节数：" + transferCount + " 耗时：" + (System.currentTimeMillis() - startTime));
-    channel.close();
-}
-```
+- 数据从内核空间缓冲区拷贝进了Socket缓冲区
+
+这张图是最完美的零拷贝模型
+
+<img src="https://img2018.cnblogs.com/blog/1496926/201907/1496926-20190708123024068-1600636514.png" alt="图片" style="zoom:80%;" />
+
+1. **首先文件从磁盘中加载进内核空间缓冲区**
+2. **CPU将内核空间缓冲区存储的数据的adress以及数据的大小存放进Socket**
+3. **协议引擎根据socket提供的数据的描述,直接去内核缓冲区取出数据**
 
 # 三、Netty高性能架构设计
 
