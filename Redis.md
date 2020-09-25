@@ -41,7 +41,7 @@
 3. 集群
 4. 事务
 
-#### 3、基础知识
+#### 2、基础知识
 
 > redis 默认 16 个数据库，默认使用第 0 个
 
@@ -57,7 +57,7 @@
 
 **核心：redis 所有数据放到内存、所以说单线程操作效率最高、对于内存系统来说，没有上下文切换效率就是最高的！多次读写都是在一个CPU上边的**
 
-#### 4、五大数据结构
+#### 3、五大数据结构
 
 Redis 是一个开源（BSD许可）的，内存中的数据结构存储系统，它可以用==作数据库、缓存和消息中间件==。 它支持多种类型的数据结构，如 ==字符串（strings）==， ==散列（hashes）==， ==列表（lists）==， ==集合（sets）==， ==有序集合（sorted sets）== 与==范围查询==， ==bitmaps==， ==hyperloglogs== 和 ==地理空间（geospatial）== 索引半径查询。 Redis 内置了 复制（replication），LUA脚本（Lua scripting）， LRU驱动事件（LRU eviction），事务（transactions） 和不同级别的 磁盘持久化（persistence）， 并通过 Redis哨兵（Sentinel）和自动 分区（Cluster）提供高可用性（high availability）。
 
@@ -155,7 +155,7 @@ hash 变更的数据 user name age 尤其是用户信息之类的，经常变动
 
 排行榜应用实现
 
-#### 5、三种特殊数据类型
+#### 4、三种特殊数据类型
 
 ##### 1、geospatial 地理位置
 
@@ -190,7 +190,7 @@ Redis Hyperloglog 基数统计的算法！
 
 Bitmaps 位图，数据结构！操作二进制来进行记录，只有 0 和 1
 
-### 6、事务
+### 3、事务
 
 Redis 事务本质：一组命令的集合！一个事务中所有命令都会被序列化，事务执行过程中，按照顺序执行
 
@@ -232,7 +232,7 @@ redis 的事务：
 
 **事务执行失败，重新获取锁，再修改即可**
 
-### 7、Jedis
+### 4、Jedis
 
 > Redis 官方推荐的 java 连接开发工具！
 
@@ -289,7 +289,7 @@ public static void main(String[] args) {
     }
 ~~~
 
-#### 8、SpringBoot 整合
+### 5、SpringBoot 整合
 
 SpringBoot 操作数据：spring-data jpa jdbc mongodb redis
 
@@ -365,7 +365,7 @@ public class RedisConfig {
 }
 ~~~
 
-### 8、Redis.conf 详解
+### 6、Redis.conf 详解
 
 - **配置文件对大小写不敏感**
 
@@ -470,7 +470,7 @@ public class RedisConfig {
   # appendfsync no
   ~~~
 
-### 9、Redis 持久化
+### 7、Redis 持久化
 
 > **什么是 RDB**
 
@@ -507,7 +507,7 @@ public class RedisConfig {
 - 需要一定时间间隔进行操作，意外宕机，最后一次修改的数据就没有了
 - fork 进程的时候，占用一定的内存空间
 
-### 10、AOF
+### 8、AOF
 
 **所有命令记录下来，history，恢复的时候都执行一遍**
 
@@ -547,7 +547,7 @@ auto-aof-rewrite-min-size 64mb
 
 ![image-20200812161536611](C:\Users\Admin\AppData\Roaming\Typora\typora-user-images\image-20200812161536611.png)
 
-### 11、Redis 发布订阅
+### 10、Redis 发布订阅
 
  Redis 发布订阅（pub/sub）是一种消息通信模式：发送者（pub）发送信息，订阅者（pub）接收信息
 
@@ -594,7 +594,7 @@ auto-aof-rewrite-min-size 64mb
 
 3、订阅、关注系统
 
-### 13、Redis 主从复制
+### 11、Redis 主从复制
 
 概念：
 
@@ -638,7 +638,7 @@ auto-aof-rewrite-min-size 64mb
 
 如果主机断开连接，可以使用 SLAVEOF no one 让自己变成主机！其他的节点就可以手动连接到最新的这个主节点！如果这个时候老大修复了，那就重新连接！
 
-### 14、Redis 缓存穿透和雪崩
+### 12、Redis 缓存穿透和雪崩
 
 > 概述
 
@@ -691,7 +691,7 @@ sentinel monitor myredis 127.0.01 6379 1
 
 2、启动哨兵！
 
-### 15、Redis 缓存穿透和雪崩
+### 13、Redis 缓存穿透和雪崩
 
 #### 1、缓存穿透
 
@@ -754,7 +754,7 @@ sentinel monitor myredis 127.0.01 6379 1
 
 ​        正式部署之前，把可能的数据先预访问一遍，这样部分可能大量访问的数据就会加载到缓存中，在即将发生大并发访问前手动触发加载缓存不同的key，设置不同的过期时间，让缓存失效的点尽量均匀。
 
-### 16、Redis 实现分布式锁
+### 14、Redis 实现分布式锁
 
 分布式锁特点：
 
@@ -764,7 +764,7 @@ sentinel monitor myredis 127.0.01 6379 1
 - 高性能和高可用： 加锁和解锁需要高效，同时也需要保证高可用，防止分布式锁失效
 - 具备阻塞和非阻塞性：能够及时从阻塞状态中被唤醒
 
-#### 分布式锁实现方式（自己实现）
+#### 1、分布式锁实现方式（自己实现）
 
 ```java
 public String defaultStock() throws InterruptedException {
@@ -796,7 +796,7 @@ public String defaultStock() throws InterruptedException {
     }
 ```
 
-#### 分布式锁实现方式（Redssion）
+#### 2、分布式锁实现方式（Redssion）
 
 ```java
 public String defaultRedissionStock() throws InterruptedException {
@@ -823,12 +823,10 @@ public String defaultRedissionStock() throws InterruptedException {
 
 使用 Redssion 主从架构 （redis QPS 接近10w、会导致锁 失效）
 
-#### 高并发分布式锁实现
+#### 3、高并发分布式锁实现
 
 - ZooKeeper
 - 超过半数加锁成功才证明加锁成功（RedLock）、也就是一个客户端同时向多个redis执行加锁操作
-
-#### 分布式锁实现方式
 
 ##### 1、基于 Redis
 
@@ -946,7 +944,7 @@ public String defaultRedissionStock() throws InterruptedException {
 
 
 
-#### API 网关设计与实践
+### 15、API 网关设计与实践
 
 
 
