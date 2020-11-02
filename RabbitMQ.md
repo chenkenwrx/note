@@ -10,25 +10,6 @@
 
 ​        **Connection :** 一个TCP的连接。Producer和Consumer都是通过TCP连接到RabbitMQ Server的
 
-
-
-作者：极客慧
-链接：https://www.jianshu.com/p/22f117f5cf95
-来源：简书
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
-
-作者：极客慧
-链接：https://www.jianshu.com/p/22f117f5cf95
-来源：简书
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
-
-
-
-作者：极客慧
-链接：https://www.jianshu.com/p/22f117f5cf95
-来源：简书
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
-
 #### 1、RabbitMQ 实现消息顺序（消息时序）
 
 1. 为什么会出现消息一致性问题
